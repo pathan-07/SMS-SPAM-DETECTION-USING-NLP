@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detection</title>
+    <link rel="stylesheet" type="text/css" href="../static/styles.css">
+</head>
+<body>
+    <h1>SMS Spam Detector</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <form method="POST" action="{{ url_for('predict_spam') }}">
+        <label for="sms_text">Enter SMS Text:</label>
+        <textarea id="sms_text" name="sms_text" rows="5" required></textarea>
+        <button type="submit">Predict</button>
+    </form>
+    <script src="../static/script.js"></script>
+</body>
+</html>

@@ -9,12 +9,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
+from datetime import datetime, timedelta
 
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
 app.secret_key = 'yourname'  # Change this to a secure secret key
 
 # Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///../instance/database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -34,6 +35,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     is_verified = db.Column(db.Boolean, default=False)
     otp = db.Column(db.String(6))
+    otp_expiration = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -46,10 +48,19 @@ with app.app_context():
     db.create_all()
 
 # Load the trained model and vectorizer
-with open('model.pkl', 'rb') as model_file:
+model_path = os.path.join(os.path.dirname(__file__), 'model.pkl')
+vectorizer_path = os.path.join(os.path.dirname(__file__), 'vectorizer.pkl')
+
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"Model file not found: {model_path}")
+
+if not os.path.exists(vectorizer_path):
+    raise FileNotFoundError(f"Vectorizer file not found: {vectorizer_path}")
+
+with open(model_path, 'rb') as model_file:
     model = pickle.load(model_file)
-    
-with open('vectorizer.pkl', 'rb') as vectorizer_file:
+
+with open(vectorizer_path, 'rb') as vectorizer_file:
     vectorizer = pickle.load(vectorizer_file)
 
 # Generate OTP
@@ -117,6 +128,7 @@ def register():
         new_user = User(email=email, username=username)
         new_user.set_password(password1)
         new_user.otp = generate_otp()  # Generate OTP
+        new_user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)  # Set OTP expiration
         
         try:
             db.session.add(new_user)
@@ -143,20 +155,22 @@ def register():
             print(f"Database error: {str(db_error)}")  # For debugging
             
     return render_template('register.html')
+
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
     if request.method == 'POST':
         otp = request.form['otp']
         user = User.query.filter_by(email=session.get('email')).first()
         
-        if user and user.otp == otp:
+        if user and user.otp == otp and user.otp_expiration > datetime.utcnow():
             user.is_verified = True
             user.otp = None  # Clear OTP after verification
+            user.otp_expiration = None  # Clear OTP expiration
             db.session.commit()
             flash('Email verified successfully! Please login.')
             return redirect(url_for('login'))
         else:
-            flash('Invalid OTP. Please try again.')
+            flash('Invalid or expired OTP. Please try again.')
             
     return render_template('otp.html')
 

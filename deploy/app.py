@@ -10,6 +10,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 from datetime import datetime, timedelta
+from sklearn.feature_extraction.text import CountVectorizer  # Ensure this import is included
 
 app = Flask(__name__, instance_relative_config=True)
 app.secret_key = 'yourname'  # Change this to a secure secret key
